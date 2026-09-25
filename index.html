@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zombie Survival</title>
+
+<style>
+*{
+  box-sizing:border-box;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+body{
+  margin:0;
+  overflow:hidden;
+  background:#080b0f;
+  font-family:Arial,sans-serif;
+  color:white;
+}
+
+#game{
+  position:relative;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  background:
+    linear-gradient(#111820,#080b0f);
+}
+
+/* HUD */
+
+#score,#wave,#health{
+  position:absolute;
+  top:12px;
+  z-index:50;
+  font-size:17px;
+}
+
+#score{
+  left:12px;
+}
+
+#wave{
+  left:50%;
+  transform:translateX(-50%);
+  color:#6ee7ff;
+}
+
+#health{
+  right:12px;
+  color:#ff6868;
+}
+
+/* ARENA */
+
+#arena{
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:75%;
+  overflow:hidden;
+  background:
+    linear-gradient(
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    );
+  background-size:40px 40px;
+}
+
+/* PLAYER */
+
+#player{
+  position:absolute;
+  width:38px;
+  height:48px;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  background:#dce6ed;
+  clip-path:polygon(
+    50% 0,
+    85% 25%,
+    100% 100%,
+    50% 78%,
+    0 100%,
+    15% 25%
+  );
+  z-index:10;
+}
+
+#player:after{
+  content:"";
+  position:absolute;
+  width:10px;
+  height:18px;
+  left:14px;
+  top:10px;
+  background:#39d9ff;
+  border-radius:5px;
+}
+
+/* ZOMBIE */
+
+.zombie{
+  position:absolute;
+  width:30px;
+  height:38px;
+  background:#668b6c;
+  border-radius:12px 12px 7px 7px;
+  z-index:5;
+}
+
+.zombie:before{
+  content:"";
+  position:absolute;
+  width:7px;
+  height:7px;
+  left:6px;
+  top:10px;
+  background:#111;
+  border-radius:50%;
+  box-shadow:11px 0 #111;
+}
+
+.zombie:after{
+  content:"";
+  position:absolute;
+  width:18px;
+  height:3px;
+  left:6px;
+  top:24px;
+  background:#253529;
+}
+
+/* BULLET */
+
+.bullet{
+  position:absolute;
+  width:7px;
+  height:7px;
+  background:#ffe36e;
+  border-radius:50%;
+  box-shadow:0 0 9px #ffe36e;
+  z-index:8;
+}
+
+/* CONTROLS */
+
+#controls{
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:25%;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+  padding:10px;
+  background:#0c1117;
+  z-index:30;
+}
+
+button{
+  border:2px solid #263746;
+  border-radius:12px;
+  background:#151e27;
+  color:white;
+  font-size:18px;
+  touch-action:manipulation;
+}
+
+button:active{
+  background:#243744;
+}
+
+#shoot{
+  border-color:#42cce8;
+}
+
+/* MESSAGE */
+
+#message{
+  position:absolute;
+  top:55px;
+  left:50%;
+  transform:translateX(-50%);
+  color:#6ee7ff;
+  font-size:18px;
+  z-index:20;
+}
+
+/* GAME OVER */
+
+#gameOver{
+  display:none;
+  position:absolute;
+  inset:0;
+  z-index:100;
+  background:rgba(0,0,0,.92);
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  text-align:center;
+}
+
+#gameOver h1{
+  font-size:36px;
+  margin-bottom:10px;
+}
+
+#restart{
+  width:160px;
+  height:55px;
+  margin-top:15px;
+  border-color:#42cce8;
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+  <div id="arena">
+
+    <div id="score">
+      Score: 0
+    </div>
+
+    <div id="wave">
+      Wave: 1
+    </div>
+
+    <div id="health">
+      Health: 3
+    </div>
+
+    <div id="message">
+      Survive
+    </div>
+
+    <div id="player"></div>
+
+  </div>
+
+
+  <div id="controls">
+
+    <button id="left">
+      LEFT
+    </button>
+
+    <button id="shoot">
+      SHOOT
+    </button>
+
+    <button id="right">
+      RIGHT
+    </button>
+
+    <button id="up">
+      UP
+    </button>
+
+    <button id="down">
+      DOWN
+    </button>
+
+  </div>
+
+
+  <div id="gameOver">
+
+    <h1>GAME OVER</h1>
+
+    <p id="finalScore">
+      Score: 0
+    </p>
+
+    <button id="restart">
+      RESTART
+    </button>
+
+  </div>
+
+</div>
+
+
+<script>
+
+/* =========================
+   GAME VARIABLES
+========================= */
+
+const arena =
+  document.getElementById("arena");
+
+const player =
+  document.getElementById("player");
+
+const scoreText =
+  document.getElementById("score");
+
+const waveText =
+  document.getElementById("wave");
+
+const healthText =
+  document.getElementById("health");
+
+const message =
+  document.getElementById("message");
+
+const gameOver =
+  document.getElementById("gameOver");
+
+const finalScore =
+  document.getElementById("finalScore");
+
+
+let playerX = 50;
+let playerY = 50;
+
+let score = 0;
+let health = 3;
+let wave = 1;
+
+let running = true;
+
+let zombies = [];
+let bullets = [];
+
+let spawnTimer = 0;
+let shootCooldown = 0;
+
+
+/* =========================
+   UPDATE HUD
+========================= */
+
+function updateHUD(){
+
+  scoreText.textContent =
+    "Score: " + score;
+
+  waveText.textContent =
+    "Wave: " + wave;
+
+  healthText.textContent =
+    "Health: " + health;
+
+  player.style.left =
+    playerX + "%";
+
+  player.style.top =
+    playerY + "%";
+
+}
+
+
+/* =========================
+   MOVE PLAYER
+========================= */
+
+function movePlayer(x,y){
+
+  if(!running)return;
+
+  playerX += x;
+  playerY += y;
+
+  if(playerX < 5)
+    playerX = 5;
+
+  if(playerX > 95)
+    playerX = 95;
+
+  if(playerY < 10)
+    playerY = 10;
+
+  if(playerY > 68)
+    playerY = 68;
+
+  updateHUD();
+
+}
+
+
+/* =========================
+   BUTTONS
+========================= */
+
+document.getElementById("left")
+.onclick = function(){
+
+  movePlayer(-7,0);
+
+};
+
+
+document.getElementById("right")
+.onclick = function(){
+
+  movePlayer(7,0);
+
+};
+
+
+document.getElementById("up")
+.onclick = function(){
+
+  movePlayer(0,-7);
+
+};
+
+
+document.getElementById("down")
+.onclick = function(){
+
+  movePlayer(0,7);
+
+};
+
+
+/* =========================
+   CREATE ZOMBIE
+========================= */
+
+function createZombie(){
+
+  const zombie =
+    document.createElement("div");
+
+  zombie.className =
+    "zombie";
+
+  let x;
+  let y;
+
+  const side =
+    Math.floor(Math.random()*4);
+
+
+  if(side === 0){
+
+    x = Math.random()*100;
+    y = -8;
+
+  }
+
+  else if(side === 1){
+
+    x = 108;
+    y = Math.random()*70;
+
+  }
+
+  else if(side === 2){
+
+    x = Math.random()*100;
+    y = 78;
+
+  }
+
+  else{
+
+    x = -8;
+    y = Math.random()*70;
+
+  }
+
+
+  zombie.style.left =
+    x + "%";
+
+  zombie.style.top =
+    y + "%";
+
+  arena.appendChild(zombie);
+
+
+  zombies.push({
+
+    element:zombie,
+
+    x:x,
+
+    y:y,
+
+    speed:
+      0.018 +
+      wave * 0.002
+
+  });
+
+}
+
+
+/* =========================
+   SHOOT
+========================= */
+
+document.getElementById("shoot")
+.onclick = function(){
+
+  shoot();
+
+};
+
+
+function shoot(){
+
+  if(!running)return;
+
+  if(shootCooldown > 0)return;
+
+  shootCooldown =
+    0.25;
+
+
+  const bullet =
+    document.createElement("div");
+
+  bullet.className =
+    "bullet";
+
+
+  bullet.style.left =
+    playerX + "%";
+
+  bullet.style.top =
+    playerY + "%";
+
+
+  arena.appendChild(bullet);
+
+
+  bullets.push({
+
+    element:bullet,
+
+    x:playerX,
+
+    y:playerY,
+
+    dx:0,
+
+    dy:-0.12
+
+  });
+
+}
+
+
+/* =========================
+   DAMAGE
+========================= */
+
+function damage(){
+
+  health--;
+
+  updateHUD();
+
+
+  if(health <= 0){
+
+    endGame();
+
+  }
+
+}
+
+
+/* =========================
+   GAME OVER
+========================= */
+
+function endGame(){
+
+  running = false;
+
+  finalScore.textContent =
+    "Score: " +
+    score +
+    " • Wave: " +
+    wave;
+
+  gameOver.style.display =
+    "flex";
+
+}
+
+
+/* =========================
+   GAME LOOP
+========================= */
+
+function gameLoop(){
+
+  if(running){
+
+    moveZombies();
+
+    moveBullets();
+
+    spawnZombies();
+
+    shootCooldown -= 0.016;
+
+    if(shootCooldown < 0)
+      shootCooldown = 0;
+
+  }
+
+  requestAnimationFrame(
+    gameLoop
+  );
+
+}
+
+
+/* =========================
+   MOVE ZOMBIES
+========================= */
+
+function moveZombies(){
+
+  for(
+    let i=zombies.length-1;
+    i>=0;
+    i--
+  ){
+
+    const z =
+      zombies[i];
+
+
+    const dx =
+      playerX - z.x;
+
+    const dy =
+      playerY - z.y;
+
+
+    const distance =
+      Math.sqrt(
+        dx*dx +
+        dy*dy
+      );
+
+
+    if(distance > 0){
+
+      z.x +=
+        (dx/distance) *
+        z.speed;
+
+      z.y +=
+        (dy/distance) *
+        z.speed;
+
+    }
+
+
+    z.element.style.left =
+      z.x + "%";
+
+    z.element.style.top =
+      z.y + "%";
+
+
+    /* PLAYER HIT */
+
+    if(distance < 6){
+
+      z.element.remove();
+
+      zombies.splice(i,1);
+
+      damage();
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   MOVE BULLETS
+========================= */
+
+function moveBullets(){
+
+  for(
+    let i=bullets.length-1;
+    i>=0;
+    i--
+  ){
+
+    const b =
+      bullets[i];
+
+
+    b.x +=
+      b.dx;
+
+    b.y +=
+      b.dy;
+
+
+    b.element.style.left =
+      b.x + "%";
+
+    b.element.style.top =
+      b.y + "%";
+
+
+    let hit = false;
+
+
+    /* ZOMBIE HIT */
+
+    for(
+      let j=zombies.length-1;
+      j>=0;
+      j--
+    ){
+
+      const z =
+        zombies[j];
+
+
+      const distance =
+        Math.sqrt(
+          Math.pow(
+            b.x-z.x,
+            2
+          ) +
+          Math.pow(
+            b.y-z.y,
+            2
+          )
+        );
+
+
+      if(distance < 6){
+
+        z.element.remove();
+
+        zombies.splice(j,1);
+
+        b.element.remove();
+
+        bullets.splice(i,1);
+
+        score += 10;
+
+        updateHUD();
+
+        hit = true;
+
+        break;
+
+      }
+
+    }
+
+
+    if(hit)continue;
+
+
+    /* BULLET OUT OF SCREEN */
+
+    if(
+      b.y < -10 ||
+      b.y > 100
+    ){
+
+      b.element.remove();
+
+      bullets.splice(i,1);
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   SPAWN ZOMBIES
+========================= */
+
+function spawnZombies(){
+
+  spawnTimer -= 0.016;
+
+
+  if(spawnTimer <= 0){
+
+    createZombie();
+
+
+    spawnTimer =
+      Math.max(
+        0.4,
+        1.5 -
+        wave*0.06
+      );
+
+  }
+
+
+  /* NEW WAVE */
+
+  if(
+    zombies.length === 0 &&
+    spawnTimer > 0
+  ){
+
+    wave++;
+
+    message.textContent =
+      "Wave " + wave;
+
+    updateHUD();
+
+  }
+
+}
+
+
+/* =========================
+   RESTART
+========================= */
+
+document.getElementById("restart")
+.onclick = function(){
+
+  zombies.forEach(
+    function(z){
+
+      z.element.remove();
+
+    }
+  );
+
+
+  bullets.forEach(
+    function(b){
+
+      b.element.remove();
+
+    }
+  );
+
+
+  zombies = [];
+
+  bullets = [];
+
+
+  playerX = 50;
+
+  playerY = 50;
+
+  score = 0;
+
+  health = 3;
+
+  wave = 1;
+
+  spawnTimer = 0;
+
+  shootCooldown = 0;
+
+  running = true;
+
+
+  gameOver.style.display =
+    "none";
+
+  message.textContent =
+    "Survive";
+
+
+  updateHUD();
+
+};
+
+
+/* =========================
+   START
+========================= */
+
+updateHUD();
+
+gameLoop();
+
+</script>
+
+</body>
+</html>
